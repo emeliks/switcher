@@ -3,8 +3,6 @@ use core::future::Future;
 #[derive(Debug)]
 pub enum Error {
 	IoError(std::io::Error),
-	#[cfg(feature="serialport")]
-	SerialPort(serialport::Error),
 	UnexpectedEof
 }
 
@@ -12,8 +10,6 @@ impl core::fmt::Display for Error {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::IoError(e) => e.fmt(f),
-			#[cfg(feature="serialport")]
-			Self::SerialPort(e) => e.fmt(f),
 			Self::UnexpectedEof => write!(f, "{self:?}")
 		}
 	}
@@ -22,13 +18,6 @@ impl core::fmt::Display for Error {
 impl From<std::io::Error> for Error {
 	fn from(r: std::io::Error) -> Self {
 		Error::IoError(r)
-	}
-}
-
-#[cfg(feature="serialport")]
-impl From<serialport::Error> for Error {
-	fn from(se: serialport::Error) -> Self {
-		Error::SerialPort(se)
 	}
 }
 

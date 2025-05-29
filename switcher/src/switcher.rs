@@ -1695,6 +1695,7 @@ impl Eval for SwEvaluator {
 			},
 			SwEvaluator::Day{ a1, a2 } => {
 				let now = Local::now();
+				#[allow(deprecated)]
 				let (sunrise, sunset) = sunrise::sunrise_sunset(a1.eval(ctx)?.into_float()? as f64, a2.eval(ctx)?.into_float()? as f64, now.year(), now.month(), now.day());
 
 				let now_t = now. timestamp();
