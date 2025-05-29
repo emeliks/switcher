@@ -39,6 +39,6 @@ Sample config file is placed in directory switcher. Config contains json data wi
 
 ```sh
 cd switcher
-./target/release/switcher ./config.json
+./target/release/switcher ./sample_config.json
 ```
 

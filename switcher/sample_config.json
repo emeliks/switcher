@@ -1,6 +1,6 @@
 {
 	"debug": 1,
-	"data_dir": "./",
+	"data_dir": "/tmp/",
 	"ip": "0.0.0.0",
 	"servers": [
 		{"id": "mqtt_server", "type": "mqtt"},
@@ -310,7 +310,7 @@
 		{"id": "zbp_dimmer_01", "group": "zbp_dimmer", "consts": {"zb_id": "a4c138875249358d"}}
 	],
 	"legacy_device_instances": [
-		{"id": "zb_03", "group": "zb_dimmer", "consts": {"zb_id": "0x2A04", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_03", "group": "zb_dimmer", "consts": {"zb_id": "0x2A04", "zb_gate_id": "D1BEF0"}}
 	],
 	"experimental_device_instances": [
 		{"id": "spotify_01", "group": "spotify", "consts": {"client_id": "xxxx", "client_secret": "xxxx", "refresh_token": "xxxx"}},
