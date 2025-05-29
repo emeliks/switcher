@@ -1,0 +1,508 @@
+{
+	"debug": 1,
+	"data_dir": "./",
+	"ip": "0.0.0.0",
+	"servers": [
+		{"id": "mqtt_server", "type": "mqtt"},
+		{"id": "http_server", "type": "http", "port": 80},
+		{"id": "sw_zb_client", "type": "mqtt_client", "ip": "127.0.0.1", "topics": ["zigbee/device/#","zigbee/system/#"], "protocol_level": 5, "local_port": 1884, "keep_alive": 60},
+		{"id": "zgate", "type": "zgate", "provider": {"type": "ezsp"}, "socket": "/dev/ttyS5", "network": {"extended_pan_id": "39a8549bc8e4f2f9","key": "00f14a4a501a0828d116059e1dd0552f", "pan_id": 36552, "channel": 20}}
+	],
+	"device_groups": {
+		"zg_presence": {
+			"data_event": {"type": "zigbee"},
+			"read": {
+				"detect": "if(zb_match(1030, 0), val() == 1)"
+			}
+		},
+		"zg_detector": {
+			"data_event": {"type": "zigbee"},
+			"read": {
+			}
+		},
+		"zg_tradfri_bulb": {
+			"data_event": {"type": "zigbee"}
+		},
+		"zg_tradfri_rc": {
+			"data_event": {"type": "zigbee"}
+		},
+		"zg_tuya_gate": {
+			"data_event": {"type": "zigbee", "extension_type": "tuya"},
+			"read": {
+				"gate_opened": "if(zb_match(61184, 3), val())",
+				"trigger": "if(zb_match(61184, 1), val())"
+			},
+			"write": {
+				"trigger": "send(map('val', if(val(), 1, 0), 'type', 1, 'identifier', 1, 'zb_id', const('zb_id'), 'cluster_id', 61184))"
+			}
+		},
+		"zg_tuya_temp": {
+			"data_event": {"type": "zigbee", "extension_type": "tuya"},
+			"read": {
+				"tmp": "if(zb_match(61184, 1), val() / 10.0)",
+				"hum": "if(zb_match(61184, 2), val() / 10.0)",
+				"bat": "if(zb_match(61184, 4), val())"
+			}
+		},
+		"zg_temp": {
+			"data_event": {"type": "zigbee"},
+			"read": {
+				"tmp": "if(zb_match(1026, 0), val() / 100.0)",
+				"hum": "if(zb_match(1029, 0), val() / 100.0)",
+				"bat": "if(zb_match(1, 33), val() * 100.0 / 255.0)"
+			}
+		},
+		"zg_switch": {
+			"data_event": {"type": "zigbee"},
+			"read": {
+				"power": "if(zb_match(6, 0), val() == true)"
+			},
+			"write": {
+				"power": "send(map('cmd', if(val(), 1, 0), 'zb_id', const('zb_id'), 'cluster_id', 6))"
+			}
+		},
+		"zg_dimmer": {
+			"data_event": {"type": "zigbee"},
+			"read": {
+				"power": "if(zb_match(6, 0), val() == true)",
+				"dim": "if(zb_match(8, 0), val())"
+			},
+			"write": {
+				"power": "send(map('cmd', if(val(), 1, 0), 'zb_id', const('zb_id'), 'cluster_id', 6))",
+				"dim": "send(map('cmd', vec(0, val(), 255, 255, 0, 0), 'zb_id', const('zb_id'), 'cluster_id', 6))"
+			}
+		},
+		"zbp_dimmer": {
+			"data_event": {"type": "in_mqtt", "client_id": "'sw_client'", "selector": "strpos(topic(), 'zigbee/device/' + const('zb_id')) == 0"},
+			"read": {
+				"power": "if(strpos(topic(), '/updated/power') > 0, json_val('powerState') == 'on')",
+				"dim": "if(strpos(topic(), '/updated/brightness') > 0, json_val('brightness'))",
+				"reachable": "if(strpos(topic(), '/availability') > 0, json_val('online'))"
+			},
+			"write": {
+				"power": "send(map('topic', 'zigbee/device/' + const('zb_id') + '/update/power', 'payload', '{\"powerState\":\"' + if(val(), 'on', 'off') + '\"}', 'properties', map('reqSequence', '12345', 'reqClientId', 'switcher', 'content-type', 'application/json')))",
+				"dim": "send(map('topic', 'zigbee/device/' + const('zb_id') + '/update/brightness', 'payload', '{\"brightness\":' + val() + '}', 'properties', map('reqSequence', '12345', 'reqClientId', 'switcher', 'content-type', 'application/json')))"
+			}
+		},
+		"zbp_gate": {
+			"data_event": {"type": "in_mqtt", "client_id": "'sw_client'", "selector": "strpos(topic(), 'zigbee/system/') == 0"},
+			"read": {
+				"discover": "if(strpos(topic(), '/system/discovering') > 0, json_val('discovering'))"
+			},
+			"write": {
+				"discover": "send(map('topic', 'zigbee/system/discover', 'payload', '{\"discover\":' + if(val(), 'true', 'false') + '}', 'properties', map('reqSequence', '12345', 'reqClientId', 'switcher', 'content-type', 'application/json')))"
+			}
+		},
+		"zbp_temp": {
+			"data_event": {"type": "in_mqtt", "client_id": "'sw_client'", "selector": "strpos(topic(), 'zigbee/device/' + const('zb_id')) == 0"},
+			"read": {
+				"tmp": "if(strpos(topic(), '/updated/temperature') > 0, json_val('temperature'))",
+				"hum": "if(strpos(topic(), '/updated/humidity') > 0, json_val('humidity'))",
+				"bat": "if(strpos(topic(), '/updated/battery') > 0, json_val('battery'))",
+				"reachable": "if(strpos(topic(), '/availability') > 0, json_val('online'))"
+			},
+			"actions": [
+				{"on": "val('hum') > 65.0", "do": "val('fan_power', true)"},
+				{"on": "val('hum') < 64.0", "do": "val('fan_power', false)"}
+			]
+		},
+		"zbp_switch": {
+			"data_event": {"type": "in_mqtt", "client_id": "'sw_client'", "selector": "strpos(topic(), 'zigbee/device/' + const('zb_id')) == 0"},
+			"read": {
+				"power": "if(strpos(topic(), '/updated/power') > 0, json_val('powerState') == 'on', if(strpos(topic(), '/updated/toggle/1') > 0, json_val('toggleState') == 'on'))",
+				"reachable": "if(strpos(topic(), '/availability') > 0, json_val('online'))"
+			},
+			"write": {
+				"power": "send(map('topic', 'zigbee/device/' + const('zb_id') + '/update/power', 'payload', '{\"powerState\":\"' + if(val(), 'on', 'off') + '\"}', 'properties', map('reqSequence', '12345', 'reqClientId', 'switcher', 'content-type', 'application/json')))"
+			}
+		},
+		"vsx": {
+			"data_event": {"type": "out_socket", "port": 23},
+			"read": {
+				"vol": "if(substr(val(), 0, 3) == 'VOL', scale(substr(val(), 3), 0, 185, 0, 100))",
+				"power": "if(substr(val(), 0, 3) == 'PWR', substr(val(), 3, 1) == '0')",
+				"speakers": "if(substr(val(), 0, 3) == 'SPK', parse_num(substr(val(), 3)))",
+				"source": "if(substr(val(), 0, 2) == 'FN', parse_num(substr(val(), 2)))",
+				"preset": "if(substr(val(), 0, 2) == 'PR', parse_num(substr(val(), 4)))",
+				"text": "if(substr(val(), 0, 2) == 'FL', decode_hex(substr(val(), 4)))",
+				"reachable": "true"
+			},
+			"write": {
+				"vol": "send(lpad(scale(val(), 0, 100, 0, 185), 3, 0) + 'vl')",
+				"power": "send(if(val(), 'po', 'pf'))",
+				"speakers": "send('' + val() + 'spk')",
+				"source": "send(lpad(val(), 2, 0) + 'fn')",
+				"preset": "send('' + val() + 'tp')"
+			},
+			"on_connect": "send(vec('?v', '?fl', '?spk', '?f', '?pr', '?p'))",
+			"actions": [
+				{"on": "val('power') == true", "do": "send(vec('?v', '?fl', '?spk', '?f', '?pr'))"}
+			]
+		},
+		"zb_temp": {
+			"data_event": {"type": "in_mqtt", "client_id": "'DVES_' + const('zb_gate_id')", "selector": "topic() == 'tele/tasmota_' + const('zb_gate_id') + '/SENSOR' && json_val('ZbReceived.' + const('zb_id') + '.Device') == const('zb_id')"},
+			"read": {
+				"tmp": "json_val('ZbReceived.' + const('zb_id') + '.EF00/0201') / 10.0",
+				"hum": "json_val('ZbReceived.' + const('zb_id') + '.EF00/0202') / 10.0",
+				"bat": "json_val('ZbReceived.' + const('zb_id') + '.EF00/0204')",
+				"reachable": "if(json_val('ZbReceived.' + const('zb_id') + '.Reachable') == false, false, true)"
+			}
+		},
+		"zb_switch": {
+			"comment": "this device sends falling or rising edge after change power (do not overwrite this behaviour)",
+			"data_event": {"type": "in_mqtt", "client_id": "'DVES_' + const('zb_gate_id')", "selector": "topic() == 'tele/tasmota_' + const('zb_gate_id') + '/SENSOR' && json_val('ZbReceived.' + const('zb_id') + '.Device') == const('zb_id')"},
+			"read": {
+				"power": "match(json_val('ZbReceived.' + const('zb_id') + '.Power'), 1, true, 0, false)",
+				"reachable": "if(json_val('ZbReceived.' + const('zb_id') + '.Reachable') == false, false, true)"
+			},
+			"write": {
+				"power": "send(map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"device\":\"' + const('zb_id') + '\", \"send\":{\"Power\":\"' + if(val(), '1', '0') + '\"} }'))"
+			},
+			"on_connect": "send(map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"Device\":\"' + const('zb_id') + '\",\"Read\":{\"Power\":true}}'))"
+		},
+		"zb_contact": {
+			"data_event": {"type": "in_mqtt", "client_id": "'DVES_' + const('zb_gate_id')", "selector": "topic() == 'tele/tasmota_' + const('zb_gate_id') + '/SENSOR' && json_val('ZbReceived.' + const('zb_id') + '.Device') == const('zb_id')"},
+			"read": {
+				"contact": "match(json_val('ZbReceived.' + const('zb_id') + '.Contact'), 1, true, 0, false)",
+				"reachable": "if(json_val('ZbReceived.' + const('zb_id') + '.Reachable') == false, false, true)"
+			},
+			"on_connect": "send(map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"Device\":\"' + const('zb_id') + '\",\"Read\":{\"Contact\":true}}'))"
+		},
+		"zb_dimmer": {
+			"comment": "this device: 1. sends falling edge after off and do not send off, 2. sends 111 after change dimmer level",
+			"data_event": {"type": "in_mqtt", "client_id": "'DVES_' + const('zb_gate_id')", "selector": "topic() == 'tele/tasmota_' + const('zb_gate_id') + '/SENSOR' && json_val('ZbReceived.' + const('zb_id') + '.Device') == const('zb_id')"},
+			"read": {
+				"power": "match(json_val('ZbReceived.' + const('zb_id') + '.Power'), 1, if(duration(val('last_off')) < 3, none, true), 0, false)",
+				"dim": "if(json_val('ZbReceived.' + const('zb_id') + '.Dimmer') == 111, none, json_val('ZbReceived.' + const('zb_id') + '.Dimmer'))",
+				"dimmer": "scale(json_val('ZbReceived.' + const('zb_id') + '.Dimmer'), 0, 255, 0, 100)",
+				"reachable": "if(json_val('ZbReceived.' + const('zb_id') + '.Reachable') == false, false, true)"
+			},
+			"write": {
+				"power": "send(map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"device\":\"' + const('zb_id') + '\", \"send\":{\"Power\":\"' + if(val(), '1', '0') + '\"} }'))",
+				"dimmer": "send(map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"device\":\"' + const('zb_id') + '\", \"send\":{\"Dimmer\":\"' + scale(val(), 0, 100, 0, 255) + '\"} }'))",
+				"dim": "send(map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"device\":\"' + const('zb_id') + '\", \"send\":{\"Dimmer\":\"' + val() + '\"} }'))"
+			},
+			"on_connect": "send(vec(map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"Device\":\"' + const('zb_id') + '\",\"Read\":{\"Power\":true}}'),map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"Device\":\"' + const('zb_id') + '\",\"Read\":{\"Dimmer\":true}}'))); val('last_off', now())",
+			"actions": [
+				{"on": "val('power') == false", "do": "val('last_off', now())"}
+			]
+		},
+		"zb_occp": {
+			"data_event": {"type": "in_mqtt", "client_id": "'DVES_' + const('zb_gate_id')", "selector": "topic() == 'tele/tasmota_' + const('zb_gate_id') + '/SENSOR' && json_val('ZbReceived.' + const('zb_id') + '.Device') == const('zb_id')"},
+			"read": {
+				"occupancy": "match(json_val('ZbReceived.' + const('zb_id') + '.Occupancy'), 1, true, 0, false)",
+				"reachable": "if(json_val('ZbReceived.' + const('zb_id') + '.Reachable') == false, false, true)"
+			},
+			"on_connect": "send(map('topic', 'cmnd/DVES_' + const('zb_gate_id') + '/zbsend', 'payload', '{\"Device\":\"' + const('zb_id') + '\",\"Read\":{\"Occupancy\":true}}'))"
+		},
+		"tsm_switch": {
+			"data_event": {"type": "in_mqtt", "client_id": "const('client_id')", "selector": "topic() == 'stat/' + const('client_id') + '/POWER'"},
+			"read": {
+				"power": "match(val(), 'ON', true, 'OFF', false)",
+				"reachable": "true"
+			},
+			"write": {
+				"power": "send(map('topic', 'stat/' + const('client_id') + '/POWER', 'payload', if(val(), 'ON', 'OFF')))"
+			},
+			"on_connect": "send(map('topic', 'cmnd/' + const('client_id') + '/Power', 'payload', ''))"
+		},
+		"bb_rgbw": {
+			"data_event": {"type": "out_http", "read_request": "'/api/rgbw/state'", "interval": 5000},
+			"read": {
+				"power": "json_val('rgbw.currentColor') != '00000000'",
+				"last_on_color": "json_val('rgbw.lastOnColor')",
+				"rgbw": "json_val('rgbw.currentColor')",
+				"rgb": "substr(json_val('rgbw.currentColor'), 0, 6)",
+				"w": "hexdec(substr(json_val('rgbw.currentColor'), 6, 2))",
+				"reachable": "true"
+			},
+			"write": {
+				"power": "send('/s/' + if(val(), val('last_on_color'), '00000000'), true)",
+				"rgbw": "send('/s/' + val())",
+				"rgb": "send('/s/' + val() + dechex(val('w'), 2))",
+				"w": "send('/s/' + val('rgb') + dechex(val(), 2))"
+			}
+		},
+		"bb_relay": {
+			"data_event": {"type": "out_http", "read_request": "'/api/relay/state'", "interval": 5000},
+			"read": {
+				"power": "json_val('relays.0.state') == 1",
+				"reachable": "true"
+			},
+			"write": {
+				"power" : "send('/s/' + if(val(), 1, 0), true)"
+			}
+		},
+		"sec_timer": {
+			"data_event": {"type": "interval", "interval": 1000},
+			"read": {
+				"time": "time()"
+			}
+		},
+		"sms": {
+			"data_event": {
+				"type": "out_http",
+				"host": "api.vpbx.pl",
+				"is_tls": true
+			},
+			"read": {
+				"sms_id": "json_val('sms_id')",
+				"error": "json_val('error')",
+				"reachable": "true",
+				"login_token": "json_val('token')"
+			},
+			"actions": [
+				{"on": "val('message') != none", "do": "send(map('url', '/api/v1/login', 'method', 'POST', 'headers', vec('Content-Type', 'application/json'), 'data', '{\"username\": \"' + const('login') + '\", \"password\": \"' + const('password') + '\"}'), true)"},
+				{"on": "val('login_token') != none && val('message') != none", "do": "send(map('url', '/api/v1/sms', 'method', 'POST', 'headers', vec('Content-Type', 'application/json', 'Authorization', 'Bearer ' + val('login_token')), 'data', '{\"from\": \"Switcher\", \"to\": \"48608614431\", \"text\": \"' + val('message') + '\"}'), true); val('login_token', none); val('message', none)"}
+			]
+		},
+		"spotify": {
+			"data_event": {
+				"type": "out_http",
+				"is_tls": true,
+				"read_request": "map('headers', vec('Authorization', 'Bearer ' + val('access_token')), 'url', '/v1/me/player/currently-playing', 'host', 'api.spotify.com')"
+			},
+			"read": {
+				"error": "json_val('error.message')",
+				"access_token": "json_val('access_token')",
+				"is_playing": "json_val('is_playing')",
+				"title": "json_val('item.name')",
+				"album": "json_val('item.album.name')",
+				"artist": "json_val('item.album.artists')",
+				"album_image_url": "json_val('item.album.images.0.url')",
+				"song_url": "json_val('item.external_urls.spotify')",
+				"progress_ms": "json_val('progress_ms')",
+				"device_name": "json_val('device.name')",
+				"volume": "json_val('device.volume_percent')"
+			},
+			"actions": [
+				{"on": "val('error') == 'No token provided'", "do": "send(map('host', 'accounts.spotify.com', 'url', '/api/token', 'method', 'POST', 'headers', vec('Content-Type', 'application/x-www-form-urlencoded', 'Authorization', 'Basic ' + base64(const('client_id') + ':' + const('client_secret'))), 'data', 'grant_type=refresh_token&refresh_token=' + const('refresh_token')), true)"}
+			]
+		}
+	},
+	"device_instances": [
+		{"id": "vsx_01","group": "vsx", "data_event": {"type": "out_socket", "host": "192.168.1.55"}},
+		{"id": "zb_01", "group": "zb_switch", "consts": {"zb_id": "0xD63C", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_02", "group": "zb_switch", "consts": {"zb_id": "0xB992", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_04", "group": "zb_switch", "consts": {"zb_id": "0x8D31", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_05", "group": "zb_contact", "consts": {"zb_id": "0xF29C", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_06", "group": "zb_occp", "consts": {"zb_id": "0x89FB", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_07", "group": "zb_switch", "consts": {"zb_id": "0x6934", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_08", "group": "zb_switch", "consts": {"zb_id": "0x10E7", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_09", "group": "zb_switch", "consts": {"zb_id": "0xA023", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_10", "group": "zb_temp", "consts": {"zb_id": "0x50E1", "zb_gate_id": "D1BEF0"}},
+		{"id": "zb_11", "group": "zb_switch", "consts": {"zb_id": "0x79F6", "zb_gate_id": "D1BEF0"}},
+		{"id": "bb_01", "group": "bb_relay", "data_event": {"type": "out_http", "host": "192.168.1.51"}},
+		{"id": "bb_02",  "group": "bb_rgbw", "data_event": {"type": "out_http", "host": "192.168.1.59"}},
+		{"id": "tsm_01", "group": "tsm_switch", "consts": {"client_id": "sonoff1"}},
+		{"id": "tsm_02", "group": "tsm_switch", "consts": {"client_id": "sonoff2"}},
+		{"id": "tsm_03", "group": "tsm_switch", "consts": {"client_id": "sonoff_mini_1"}},
+		{"id": "tsm_05", "group": "tsm_switch", "consts": {"client_id": "ais_01"}},
+		{"id": "tsm_06", "group": "tsm_switch", "consts": {"client_id": "ais_02"}},
+		{"id": "tsm_07", "group": "tsm_switch", "consts": {"client_id": "ais_03"}},
+		{"id": "tsm_08", "group": "tsm_switch", "consts": {"client_id": "ais_04"}},
+		{"id": "timer_01", "group": "sec_timer"},
+		{"id": "zbp_temp_01", "group": "zbp_temp", "consts": {"zb_id": "00124b002a6bf3bb"}},
+		{"id": "zbp_switch_01", "group": "zbp_switch", "consts": {"zb_id": "70b3d52b6001f986"}},
+		{"id": "zbp_switch_02", "group": "zbp_switch", "consts": {"zb_id": "a4c138f9c587d759"}},
+		{"id": "zbp_switch_03", "group": "zbp_switch", "consts": {"zb_id": "e0798dfffeb27d8d"}},
+		{"id": "zbp_gate_01", "group": "zbp_gate"},
+		{"id": "zbp_dimmer_01", "group": "zbp_dimmer", "consts": {"zb_id": "a4c138875249358d"}}
+	],
+	"legacy_device_instances": [
+		{"id": "zb_03", "group": "zb_dimmer", "consts": {"zb_id": "0x2A04", "zb_gate_id": "D1BEF0"}},
+	],
+	"experimental_device_instances": [
+		{"id": "spotify_01", "group": "spotify", "consts": {"client_id": "xxxx", "client_secret": "xxxx", "refresh_token": "xxxx"}},
+		{"id": "sms_01", "group": "sms", "consts": {"login": "xxxx", "password": "xxxx"}}
+	],
+	"actions": [
+		{"on": "val('zb_04.power') == false", "do": "val('zb_04.lamp_on_val', false); val('zb_04.last_off', now())", "comment": "Remember last off to disable turn lamp on after switched off by hand, by the occupancy sensor"},
+		{"do": "val('tsm_05.power', val('vsx_01.power') && val('vsx_01.speakers') == 1)"},
+		{"do": "val('tsm_07.power', val('zbp_switch_02.power') == true || val('zb_07.power') == true)"},
+		{"on": "val('zb_05.contact') == true", "do": "val('zb_04.lamp_on_val', val('zb_04.power')); val('zb_04.power', true)", "comment": "After swith gate lamp off keep garage lamp on existing state"},
+		{"on": "val('zb_05.contact') == false", "do": "val('zb_04.power', val('zb_04.lamp_on_val'))"},
+		{"on": "val('zb_06.occupancy') == true && duration(val('zb_04.last_off')) > 5", "do": "val('zb_04.power', true)"},
+		{"on": "val('timer_01.time') in ('20:00:00', '21:00:00', '23:00:00') ", "do": "val('tsm_06.power', false)"},
+		{"on": "val('timer_01.time') in ('20:00:03', '21:00:03', '09:00:00') ", "do": "val('tsm_06.power', true)"},
+		{"on": "val('bb_02.power') == true", "do": "val('sms_01.message', 'Study room llight on.')"},
+		{"on": "val('zb_10.hum') > 65.0", "do": "val('zb_11.power', true)"},
+		{"on": "val('zb_10.hum') < 64.0", "do": "val('zb_11.power', false)"}
+	],
+	"services": [
+		{
+			"type": "switcher",
+			"path": "/switcher/",
+			"dir": "/opt/switcher/",
+			"system": {
+				"id": "sys_01",
+				"pages": [
+					{
+						"title": "AV Receiver",
+						"elements": [
+							{
+								"title": "AV Receiver",
+								"display": "panel",
+								"icon": "amp",
+								"controls": [
+									{"role": "primary", "type": "switch", "title": "Power", "attr": "vsx_01.power", "props": {"reachable": "vsx_01.reachable"}},
+									{"role": "tetrary", "type": "range", "title": "Volume", "attr": "vsx_01.vol", "min": 0, "max": 100},
+									{"role": "status", "type": "text", "title": "Text", "attr": "vsx_01.text"}
+								]
+							},
+							{
+								"controls": [
+									{"type": "select", "title": "Source", "attr": "vsx_01.source", "value_map": {"4": "DVD", "5": "TV", "25": "PS3", "1": "Alexa", "2": "Tuner", "15": "Bluetooth MBL-HD", "26": "AirPlay"}},
+									{"type": "select", "title": "Speakers", "attr": "vsx_01.speakers", "value_map": {"0": "Off", "1": "Livingroom", "2": "Workroom", "3": "All"}},
+									{"type": "select", "title": "Station", "attr": "vsx_01.preset", "value_map": {"1": "S1", "2": "S2"}}
+								]
+							},
+							{
+								"title": "Subwoofer",
+								"display": "panel",
+								"icon": "speaker",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "tsm_05.power"}
+								]
+							}
+						]
+					},
+					{
+						"title": "Gabinet",
+						"elements": [
+							{
+								"title": "Light",
+								"display": "panel",
+								"icon": "bulb",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "bb_02.power"},
+									{"role": "secondary", "type": "rgb", "attr": "bb_02.rgb"},
+									{"role": "status", "type": "range", "min": 0, "max": 255, "attr": "bb_02.w"}
+								]
+							},
+							{
+								"title": "Projector",
+								"display": "panel",
+								"icon": "switch",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "bb_01.power"}
+								]
+							},
+							{
+								"title": "Params",
+								"display": "panel",
+								"icon": "temp",
+								"controls": [
+									{"role": "primary", "type": "text", "title": "Temperature", "attr": "zbp_temp_01.tmp", "round": 2, "unit": "°C"},
+									{"role": "secondary", "type": "text", "title": "Humidity", "attr": "zbp_temp_01.hum", "round": 2, "unit": "%"}
+								],
+								"props": {"reachable": "zbp_temp_01.reachable", "battery": "zbp_temp_01.bat"}
+							},
+							{
+								"title": "Switch",
+								"display": "panel",
+								"icon": "switch",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "zbp_switch_01.power"}
+								]
+							}
+						]
+					},
+					{
+						"title": "Garage",
+						"elements": [
+							{
+								"title": "Light",
+								"display": "panel",
+								"icon": "bulb",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "zb_04.power"}
+								],
+								"props": {"reachable": "zb_04.reachable"}
+							}
+						]
+					},
+					{
+						"title": "Livingroom",
+						"elements": [
+							{
+								"title": "Aquarium",
+								"display": "panel",
+								"icon": "bulb",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "tsm_06.power"}
+								],
+								"props": {"reachable": "tsm_06.reachable"}
+							},
+							{
+								"title": "Wall lignts",
+								"display": "panel",
+								"icon": "bulb",
+								"controls": [
+									{"role": "tetrary", "type": "range", "attr": "zbp_dimmer_01.dim", "min": 0, "max": 100},
+									{"role": "primary", "type": "switch", "attr": "zbp_dimmer_01.power"}
+								],
+								"props": {"reachable": "zbp_dimmer_01.reachable"}
+							}
+						]
+					},
+					{
+						"title": "Bathroom",
+						"elements": [
+							{
+								"title": "Light",
+								"display": "panel",
+								"icon": "bulb",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "zbp_switch_02.power"}
+								],
+								"props": {"reachable": "zbp_switch_02.reachable"}
+							},
+							{
+								"title": "Ventilation",
+								"display": "panel",
+								"icon": "air",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "zb_11.power"}
+								],
+								"props": {"reachable": "zb_11.reachable"}
+							},
+							{
+								"title": "Params",
+								"display": "panel",
+								"icon": "temp",
+								"controls": [
+									{"role": "primary", "type": "text", "title": "Temperature", "attr": "zb_10.tmp", "round": 2, "unit": "°C"},
+									{"role": "secondary", "type": "text", "title": "Humidity", "attr": "zb_10.hum", "round": 2, "unit": "%"}
+								],
+								"props": {"reachable": "zb_10.reachable", "battery": "zb_10.bat"}
+							},
+							{
+								"title": "Circulation",
+								"display": "panel",
+								"icon": "water",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "tsm_07.power"}
+								],
+								"props": {"reachable": "tsm_07.reachable"}
+							}
+						]
+					},
+					{
+						"title": "Zigbee gate",
+						"elements": [
+							{
+								"title": "Discover",
+								"display": "panel",
+								"icon": "bulb",
+								"controls": [
+									{"role": "primary", "type": "switch", "attr": "zbp_gate_01.discover"}
+								]
+							}
+						]
+					}
+				]
+			}
+		}
+	]
+}

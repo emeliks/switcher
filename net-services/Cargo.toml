@@ -1,0 +1,23 @@
+[package]
+name = "net-services"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+async-std = { version = "1.12.0", features = ["attributes"], optional = true }
+async-tls = { version = "0.10.0", optional = true }
+sha1_smol = { version = "1.0.0", optional = true }
+base64 = { version = "0.21.0", optional = true }
+futures = { version = "0.3.27", optional = true }
+async-io = { version = "2", optional = true }
+rustls = { version = "0.22.0", optional = true }
+
+[features]
+futures = ["dep:futures"]
+async-std = ["dep:async-std", "futures"]
+async-tls = ["dep:async-std", "dep:async-tls", "futures"]
+websocket = ["dep:sha1_smol", "dep:base64"]
+rustls = ["dep:rustls"]
+
+# embedded version
+async-io = ["dep:async-io", "futures"]

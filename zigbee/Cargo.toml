@@ -1,0 +1,10 @@
+[package]
+name = "zigbee"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+deku = "0.17.0"
+serde_json = "1.0.93"
+serde = { version = "1.0.152", features = ["derive"] }
+frames = { path = "../frames" }

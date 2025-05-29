@@ -1,0 +1,5 @@
+#default
+cargo build -r
+
+#android arm
+cross build --target armv7-linux-androideabi --release
